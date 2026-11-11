@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自然冒險者公會 - 學生入口（換裝室與商行）</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 React 和 ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- 引入 Babel 讓瀏覽器解析 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- 引入 FontAwesome 圖示 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        guild: {
+                            dark: '#1a1614',
+                            paper: '#d4c4a8',
+                            gold: '#c59f44',
+                            red: '#8b0000',
+                            panel: '#2a2420'
+                        }
+                    },
+                    fontFamily: {
+                        serif: ['"Georgia"', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #1a1614;
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%232d2622' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            color: #d4c4a8;
+            font-family: 'Georgia', serif;
+        }
+        /* 自訂卷軸 */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1a1614; }
+        ::-webkit-scrollbar-thumb { background: #c59f44; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #e0b95b; }
+        
+        .hp-bar-container { width: 100%; background-color: #4a0000; border: 1px solid #c59f44; border-radius: 999px; overflow: hidden; height: 0.75rem; }
+        .hp-bar-fill { background-color: #ff3333; height: 100%; transition: width 0.3s ease; }
+        .exp-bar-container { width: 100%; background-color: #112233; border: 1px solid #446688; border-radius: 999px; overflow: hidden; height: 0.5rem; margin-top: 2px; }
+        .exp-bar-fill { background-color: #44aaff; height: 100%; transition: width 0.3s ease; }
+        
+        .panel { background-color: #2a2420; border: 1px solid #4a4036; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5); border-radius: 0.5rem; }
+
+        /* ★ 個人資料表列印專用樣式：列印時只顯示 .print-report-portal，其餘全部隱藏 */
+        @media print {
+            body > *:not(.print-report-portal) { display: none !important; }
+            .print-report-portal { position: static !important; background: white !important; }
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        /* ↑ 修正：移除動畫中的 transform（即使是 translateY(0)）。
+           CSS 規則：任何非 none 的 transform 會讓該元素變成子孫 fixed 定位元素的「定位基準」，
+           導致所有 Modal 視窗（獎懲、招募、商店…）都被錨定在這個較小的容器內而不是整個瀏覽器視窗，
+           造成無論怎麼調整 max-h / vh 都還是會被裁切的問題。改成只用 opacity 淡入即可徹底解決。 */
+        
+        /* 基本浮動與震動 */
+        @keyframes shakeRed {
+            0%, 100% { transform: translateX(0); filter: brightness(1); }
+            20%, 60% { transform: translateX(-15px); filter: brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(10); }
+            40%, 80% { transform: translateX(15px); filter: brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(10); }
+        }
+        .anim-shake-red { animation: shakeRed 0.6s ease-in-out; }
+        
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-80px) scale(1.5); opacity: 0; }
+        }
+        .anim-float-up { animation: floatUp 1.2s ease-out forwards; }
+        
+        .anim-fade-out { animation: fadeOut 0.8s ease-out forwards; }
+        @keyframes fadeOut { to { opacity: 0; transform: scale(0.5) filter: blur(10px); } }
+
+        /* 老虎機滾動 */
+        @keyframes spinReel {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(calc(-100% + 160px)); }
+        }
+        .spin-reel-student { animation: spinReel 1.5s cubic-bezier(0.15, 0.85, 0.3, 1) forwards; will-change: transform; }
+        .spin-reel-monster { animation: spinReel 3s cubic-bezier(0.15, 0.85, 0.3, 1) forwards; will-change: transform; }
+
+        /* ---------------------------------
+           華麗職業特效動畫 (VFX)
+        ---------------------------------- */
+        @keyframes vfx-slash {
+            0% { transform: scale(3) rotate(45deg) translate(-50px, -50px); opacity: 0; }
+            20% { transform: scale(1.5) rotate(45deg) translate(0, 0); opacity: 1; filter: drop-shadow(0 0 20px white); }
+            80% { transform: scale(1.2) rotate(45deg) translate(20px, 20px); opacity: 0.8; }
+            100% { transform: scale(1) rotate(45deg) translate(50px, 50px); opacity: 0; }
+        }
+        .vfx-warrior { animation: vfx-slash 0.5s ease-out forwards; }
+
+        @keyframes vfx-magic {
+            0% { transform: scale(0) rotate(0deg); opacity: 0; filter: hue-rotate(0deg); }
+            30% { transform: scale(2.5) rotate(90deg); opacity: 1; filter: hue-rotate(180deg) drop-shadow(0 0 30px cyan); }
+            100% { transform: scale(4) rotate(180deg); opacity: 0; filter: drop-shadow(0 0 50px blue); }
+        }
+        .vfx-mage { animation: vfx-magic 0.7s ease-out forwards; }
+
+        @keyframes vfx-arrow {
+            0% { transform: translateX(-150px) scale(2); opacity: 0; }
+            30% { transform: translateX(0px) scale(2); opacity: 1; filter: drop-shadow(0 0 10px lime); }
+            100% { transform: translateX(150px) scale(2); opacity: 0; }
+        }
+        .vfx-ranger { animation: vfx-arrow 0.4s ease-in forwards; }
+        
+        @keyframes vfx-dash {
+            0% { transform: translateX(-100px) scale(2) skewX(30deg); opacity: 0; filter: drop-shadow(0 0 10px purple); }
+            50% { transform: translateX(0px) scale(2.5) skewX(0deg); opacity: 1; filter: drop-shadow(0 0 20px purple); }
+            100% { transform: translateX(100px) scale(2) skewX(-30deg); opacity: 0; filter: drop-shadow(0 0 10px purple); }
+        }
+        .vfx-assassin { animation: vfx-dash 0.4s ease-out forwards; }
+
+        @keyframes vfx-heal {
+            0% { transform: scale(0.5) translateY(20px); opacity: 0; filter: drop-shadow(0 0 10px yellow); }
+            50% { transform: scale(2.5) translateY(-20px); opacity: 1; filter: drop-shadow(0 0 30px yellow); }
+            100% { transform: scale(3) translateY(-40px); opacity: 0; filter: drop-shadow(0 0 10px yellow); }
+        }
+        .vfx-cleric { animation: vfx-heal 0.8s ease-out forwards; }
+
+        @keyframes vfx-claw {
+            0% { transform: scale(3) rotate(-30deg); opacity: 0; color: white; }
+            30% { transform: scale(1.5) rotate(0deg); opacity: 1; color: red; filter: drop-shadow(0 0 20px darkred); }
+            100% { transform: scale(1.2) rotate(20deg); opacity: 0; color: darkred; }
+        }
+        .vfx-monster { animation: vfx-claw 0.5s ease-out forwards; }
+        
+        @keyframes vfx-punch {
+            0% { transform: scale(0.5); opacity: 0; }
+            40% { transform: scale(2.5); opacity: 1; filter: drop-shadow(0 0 10px white); }
+            100% { transform: scale(3); opacity: 0; }
+        }
+        .vfx-novice { animation: vfx-punch 0.5s ease-out forwards; }
+
+        .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c59f44; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        const { useState, useEffect, useRef } = React;
+
+        const JOBS = {
+            '新手': { icon: 'fa-user', bonus: '努力升級，存錢購買轉職憑證', color: 'text-gray-400' },
+            '戰士': { icon: 'fa-shield-halved', bonus: '個人受到傷害減少 5 點', color: 'text-red-500' },
+            '法師': { icon: 'fa-wand-sparkles', bonus: '個人答對額外獲得 10% 經驗', color: 'text-blue-500' },
+            '遊俠': { icon: 'fa-user-ninja', bonus: '任務結算的經驗與金幣皆獲得 3% 額外加成', color: 'text-green-500' },
+            '刺客': { icon: 'fa-khanda', bonus: '個人有 20% 機率完全閃避傷害', color: 'text-purple-500' },
+            '牧師': { icon: 'fa-cross', bonus: '每次任務結算恢復小隊 5 點生命，並可隨機復活一位陣亡隊員', color: 'text-yellow-400' }
+        };
+        const genOpts = (prefix, count, label) => Array.from({ length: count }, (_, i) => ({ id: `${prefix}${String(i + 1).padStart(2, '0')}`, name: `${label} ${String(i + 1).padStart(2, '0')}` }));
+
+        const AVATAR_OPTIONS = {
+            skinColor: [ { id: 'ffe0bd', name: '人類 (透白)' }, { id: 'f2d3b1', name: '人類 (白皙)' }, { id: 'e6c19c', name: '人類 (自然)' }, { id: 'd4a373', name: '人類 (小麥)' }, { id: 'c68642', name: '人類 (古銅)' }, { id: '8d5524', name: '人類 (深棕)' }, { id: '4a2e1b', name: '人類 (黑曜)' }, { id: 'fcf8ff', name: '高精靈 (月光白)' }, { id: 'e0e7ff', name: '水精靈 (星空藍)' }, { id: 'f3e8ff', name: '光精靈 (晨曦紫)' }, { id: 'd8b4fe', name: '暗精靈 (魅惑紫)' }, { id: 'a7f3d0', name: '森精靈 (嫩葉綠)' }, { id: '86efac', name: '半獸人 (翠綠)' }, { id: 'fca5a5', name: '魔族 (烈焰紅)' }, { id: 'd1d5db', name: '亡靈 (蒼灰)' }, { id: 'fef08a', name: '神族 (耀金)' } ],
+            hairColor: [ { id: '111111', name: '深邃黑' }, { id: '5c3a21', name: '原木棕' }, { id: 'fbbf24', name: '耀眼金' }, { id: 'ef4444', name: '烈焰紅' }, { id: 'f8fafc', name: '蒼霜白' }, { id: 'a855f7', name: '秘法紫' }, { id: 'ec4899', name: '櫻花粉' }, { id: '3b82f6', name: '冰霜藍' } ],
+            head: genOpts('variant', 4, '臉型'), // ★ 修正：DiceBear lorelei 實際上只有 4 種臉型，原本設 12 種會有 8 種無效值(選了沒反應)
+            hair: genOpts('variant', 35, '髮型'), 
+            eyes: genOpts('variant', 14, '眼睛'), 
+            eyebrows: genOpts('variant', 12, '眉毛'), 
+            mouth: genOpts('happy', 14, '嘴巴'),
+            glasses: [ { id: 'none', name: '無眼鏡' }, ...genOpts('variant', 5, '眼鏡') ], 
+            freckles: [ { id: '0', name: '乾淨無瑕' }, { id: '100', name: '點點雀斑' } ],
+            // ★ 新增：配件 (耳環、髮飾)，讓玩家不用只靠盲盒也能直接選擇配飾
+            earrings: [ { id: 'none', name: '無耳環' }, { id: 'variant01', name: '耳環款式 01' }, { id: 'variant02', name: '耳環款式 02' }, { id: 'variant03', name: '耳環款式 03' } ],
+            hairAccessories: [ { id: 'none', name: '無髮飾' }, { id: 'flowers', name: '花朵髮飾' } ],
+            frames: [ { id: 'border-gray-500', name: '預設鐵框' }, { id: 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.8)]', name: '聖騎黃金外框' }, { id: 'border-purple-600 shadow-[0_0_20px_rgba(147,51,234,0.8)]', name: '深淵魔氣外框' }, { id: 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]', name: '精靈流光外框' } ]
+        };
+        const AvatarDisplay = ({ student, size = "w-16 h-16", showJob = true, previewPending = false }) => {
+            if (!student || !student.avatar) return null;
+            const { avatar, job } = student;
+            const showCustom = avatar.customImage && (avatar.customImageStatus === 'approved' || (previewPending && avatar.customImageStatus === 'pending'));
+            const skinColor = AVATAR_OPTIONS.skinColor.some(o => o.id === avatar.skinColor) ? avatar.skinColor : 'f2d3b1';
+            const hairColor = AVATAR_OPTIONS.hairColor.some(o => o.id === avatar.hairColor) ? avatar.hairColor : '111111';
+            const head = AVATAR_OPTIONS.head.some(o => o.id === avatar.head) ? avatar.head : 'variant01';
+            const hair = AVATAR_OPTIONS.hair.some(o => o.id === avatar.hair) ? avatar.hair : 'variant01';
+            const eyes = AVATAR_OPTIONS.eyes.some(o => o.id === avatar.eyes) ? avatar.eyes : 'variant01';
+            const eyebrows = AVATAR_OPTIONS.eyebrows.some(o => o.id === avatar.eyebrows) ? avatar.eyebrows : 'variant01';
+            const mouth = AVATAR_OPTIONS.mouth.some(o => o.id === avatar.mouth) ? avatar.mouth : 'happy01';
+            const glasses = AVATAR_OPTIONS.glasses.some(o => o.id === avatar.glasses) ? avatar.glasses : 'none';
+            const freckles = AVATAR_OPTIONS.freckles.some(o => o.id === avatar.freckles) ? avatar.freckles : '0';
+            const earrings = AVATAR_OPTIONS.earrings.some(o => o.id === avatar.earrings) ? avatar.earrings : 'none';
+            const hairAccessories = AVATAR_OPTIONS.hairAccessories.some(o => o.id === avatar.hairAccessories) ? avatar.hairAccessories : 'none';
+            const seed = encodeURIComponent(avatar.seed || student.name);
+            
+            let url = `https://api.dicebear.com/9.x/lorelei/svg?seed=${seed}&head=${head}&hair=${hair}&eyes=${eyes}&eyebrows=${eyebrows}&mouth=${mouth}&skinColor=${skinColor}&hairColor=${hairColor}&backgroundColor=transparent`;
+            url += glasses !== 'none' ? `&glasses=${glasses}&glassesProbability=100` : `&glassesProbability=0`;
+            url += freckles === '100' ? `&frecklesProbability=100` : `&frecklesProbability=0`;
+            url += earrings !== 'none' ? `&earrings=${earrings}&earringsProbability=100` : `&earringsProbability=0`;
+            url += hairAccessories !== 'none' ? `&hairAccessories=${hairAccessories}&hairAccessoriesProbability=100` : `&hairAccessoriesProbability=0`;
+
+            return (
+                <div className={`relative flex-shrink-0 ${size} ${avatar.frameClass} border-2 border-solid rounded-lg box-border transition-all duration-300 bg-guild-panel flex items-center justify-center overflow-hidden shadow-inner`}>
+                    {showCustom ? (
+                        <img src={avatar.customImage} alt={student.name} className="w-full h-full object-cover image-rendering-pixelated" style={{imageRendering: 'pixelated'}} />
+                    ) : (
+                        <img src={url} alt={student.name} className="w-[115%] h-[115%] object-contain origin-bottom transform scale-110" onError={(e) => { e.target.onerror = null; e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23666'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E"; }} />
+                    )}
+                    {avatar.customImageStatus === 'pending' && previewPending && <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-yellow-400 text-xs font-bold z-20 backdrop-blur-[1px]">審核中</div>}
+                    {showJob && job !== '新手' && (
+                        <div className="absolute -bottom-2 -right-2 bg-guild-dark border border-guild-gold rounded-full w-6 h-6 flex items-center justify-center text-[10px] shadow-lg z-30">
+                            <i className={`fa-solid ${JOBS[job].icon} ${JOBS[job].color}`}></i>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+        const AvatarEditor = ({ student, onSave, onClose }) => {
+            const [editConfig, setEditConfig] = useState({
+                ...student.avatar,
+                skinColor: AVATAR_OPTIONS.skinColor.some(o => o.id === student.avatar.skinColor) ? student.avatar.skinColor : 'f2d3b1',
+                hairColor: AVATAR_OPTIONS.hairColor.some(o => o.id === student.avatar.hairColor) ? student.avatar.hairColor : '111111',
+                head: AVATAR_OPTIONS.head.some(o => o.id === student.avatar.head) ? student.avatar.head : 'variant01',
+                hair: AVATAR_OPTIONS.hair.some(o => o.id === student.avatar.hair) ? student.avatar.hair : 'variant01',
+                eyes: AVATAR_OPTIONS.eyes.some(o => o.id === student.avatar.eyes) ? student.avatar.eyes : 'variant01',
+                eyebrows: AVATAR_OPTIONS.eyebrows.some(o => o.id === student.avatar.eyebrows) ? student.avatar.eyebrows : 'variant01',
+                mouth: AVATAR_OPTIONS.mouth.some(o => o.id === student.avatar.mouth) ? student.avatar.mouth : 'happy01',
+                glasses: AVATAR_OPTIONS.glasses.some(o => o.id === student.avatar.glasses) ? student.avatar.glasses : 'none',
+                freckles: AVATAR_OPTIONS.freckles.some(o => o.id === student.avatar.freckles) ? student.avatar.freckles : '0',
+                earrings: AVATAR_OPTIONS.earrings.some(o => o.id === student.avatar.earrings) ? student.avatar.earrings : 'none',
+                hairAccessories: AVATAR_OPTIONS.hairAccessories.some(o => o.id === student.avatar.hairAccessories) ? student.avatar.hairAccessories : 'none',
+                customImage: student.avatar.customImage || null,
+                customImageStatus: student.avatar.customImageStatus || 'none'
+            });
+            const [tab, setTab] = useState('custom');
+
+            const handleSave = () => { onSave(student.id, editConfig); };
+            const getRandomOpt = (opts) => opts[Math.floor(Math.random() * opts.length)].id;
+            const handleRandomize = () => {
+                setEditConfig({
+                    ...editConfig,
+                    seed: Math.random().toString(36).substring(7),
+                    skinColor: getRandomOpt(AVATAR_OPTIONS.skinColor),
+                    hairColor: getRandomOpt(AVATAR_OPTIONS.hairColor),
+                    head: getRandomOpt(AVATAR_OPTIONS.head),
+                    hair: getRandomOpt(AVATAR_OPTIONS.hair),
+                    eyes: getRandomOpt(AVATAR_OPTIONS.eyes),
+                    eyebrows: getRandomOpt(AVATAR_OPTIONS.eyebrows),
+                    mouth: getRandomOpt(AVATAR_OPTIONS.mouth),
+                    glasses: Math.random() > 0.8 ? getRandomOpt(AVATAR_OPTIONS.glasses.slice(1)) : 'none',
+                    freckles: Math.random() > 0.8 ? '100' : '0',
+                    earrings: Math.random() > 0.7 ? getRandomOpt(AVATAR_OPTIONS.earrings.slice(1)) : 'none',
+                    hairAccessories: Math.random() > 0.85 ? getRandomOpt(AVATAR_OPTIONS.hairAccessories.slice(1)) : 'none',
+                    customImage: null, customImageStatus: 'none'
+                });
+            };
+
+            const handleImageUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_SIZE = 150; 
+                        let width = img.width; let height = img.height;
+                        if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } 
+                        else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
+                        canvas.width = width; canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                        setEditConfig({ ...editConfig, customImage: dataUrl, customImageStatus: 'pending' });
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const TABS_CONFIG = [
+                { id: 'custom', label: '自訂上傳(Reroll)', icon: 'fa-upload', color: 'text-green-400' },
+                { id: 'blindBox', label: '盲盒', icon: 'fa-dice', color: 'text-blue-400' },
+                { id: 'skinColor', label: '膚色' }, { id: 'head', label: '臉型' }, { id: 'hairColor', label: '染髮' },
+                { id: 'hair', label: '髮型' }, { id: 'eyes', label: '眼睛' }, { id: 'eyebrows', label: '眉毛' },
+                { id: 'mouth', label: '嘴巴' }, { id: 'glasses', label: '眼鏡' }, { id: 'freckles', label: '雀斑' },
+                { id: 'accessories', label: '配件', icon: 'fa-gem', color: 'text-pink-400' },
+                { id: 'frames', label: '外框', icon: 'fa-crown', color: 'text-yellow-500' }
+            ];
+
+            return (
+                <div className="fixed inset-0 bg-black/85 flex p-4 z-50 overflow-y-auto">
+                    <div className="panel p-0 max-w-5xl w-full flex flex-col md:flex-row relative border-guild-gold shadow-[0_0_30px_rgba(197,159,68,0.3)] m-auto">
+                        <div className="md:w-1/3 bg-guild-dark p-6 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-guild-gold/30">
+                            <h2 className="text-xl font-bold text-guild-gold mb-6"><i className="fa-solid fa-scissors mr-2"></i>冒險者換裝室</h2>
+                            <AvatarDisplay student={{...student, avatar: editConfig}} size="w-48 h-48" showJob={true} previewPending={true} />
+                            <div className="mt-6 text-center">
+                                <div className="text-2xl font-bold tracking-wider text-guild-paper">{student.name}</div>
+                                <div className="text-sm text-gray-400 mt-1">Lv.{student.level} {student.job}</div>
+                            </div>
+                        </div>
+                        <div className="md:w-2/3 flex flex-col h-[65vh] md:h-[600px]">
+                            <div className="flex items-stretch bg-guild-dark border-b border-guild-gold/20 shrink-0">
+                                <div className="flex overflow-x-auto custom-scrollbar flex-1 min-w-0">
+                                    {TABS_CONFIG.map(t => (
+                                        <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-4 text-sm font-bold whitespace-nowrap transition flex items-center gap-1 shrink-0 ${tab===t.id ? (t.color || 'bg-guild-gold text-guild-dark') : 'text-gray-400 hover:text-white'}`}>
+                                            {t.icon && <i className={`fa-solid ${t.icon}`}></i>} {t.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <button onClick={onClose} title="關閉" className="w-14 shrink-0 flex items-center justify-center text-gray-400 hover:text-white hover:bg-red-900/50 transition border-l border-guild-gold/20 text-xl"><i className="fa-solid fa-xmark"></i></button>
+                            </div>
+                            <div className="p-4 overflow-y-auto flex-1 bg-guild-panel/50 custom-scrollbar">
+                                {tab === 'custom' && (
+                                    <div className="flex flex-col items-center justify-center h-full text-center space-y-4 p-4">
+                                        <h3 className="text-2xl text-green-400 font-bold mb-2"><i className="fa-solid fa-mobile-screen-button mr-2"></i>Reroll 專屬頭像上傳</h3>
+                                        <p className="text-gray-300">想要擁有精靈耳、獸耳等與眾不同的種族外觀嗎？<br/>請前往 <a href="https://reroll.co" target="_blank" className="text-blue-400 font-bold underline hover:text-blue-300 transition">Reroll 網站</a> 製作專屬角色，截圖並上傳至此！</p>
+                                        <p className="text-sm text-yellow-500 bg-yellow-900/20 p-3 rounded border border-yellow-900/30 max-w-sm mt-4"><i className="fa-solid fa-triangle-exclamation mr-1"></i> 上傳後，需由老師於後台審核通過，才會正式顯示於公會名冊中喔！</p>
+                                        <div className="bg-guild-dark p-4 rounded-lg w-full max-w-sm border border-gray-600 mt-4">
+                                            {editConfig.customImageStatus === 'none' && <div className="text-gray-400">尚未上傳自訂頭像。</div>}
+                                            {editConfig.customImageStatus === 'pending' && <div className="text-yellow-400 font-bold"><i className="fa-solid fa-hourglass-half mr-2"></i>狀態：等待老師審核中...</div>}
+                                            {editConfig.customImageStatus === 'approved' && <div className="text-green-400 font-bold"><i className="fa-solid fa-check mr-2"></i>狀態：已通過審核！</div>}
+                                            {editConfig.customImageStatus === 'rejected' && <div className="text-red-400 font-bold"><i className="fa-solid fa-xmark mr-2"></i>狀態：被退回，請重新上傳。</div>}
+                                        </div>
+                                        <div className="mt-6 flex flex-wrap justify-center gap-4">
+                                            <label className="cursor-pointer px-6 py-3 bg-green-700 hover:bg-green-600 text-white font-bold rounded shadow transition">
+                                                <i className="fa-solid fa-cloud-arrow-up mr-2"></i> 選擇圖片上傳
+                                                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                                            </label>
+                                            {editConfig.customImage && (
+                                                <button onClick={() => setEditConfig({...editConfig, customImage: null, customImageStatus: 'none'})} className="px-6 py-3 bg-red-900 hover:bg-red-800 text-white font-bold rounded shadow transition">
+                                                    <i className="fa-solid fa-trash mr-2"></i> 移除自訂圖片
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                                {tab === 'blindBox' && (
+                                    <div className="flex flex-col items-center justify-center h-full text-center space-y-6 p-4">
+                                        <i className="fa-solid fa-wand-magic-sparkles text-6xl text-blue-400 opacity-80"></i>
+                                        <p className="text-gray-300 text-lg">不知道該怎麼搭配嗎？<br/>點擊下方按鈕，命運之神將為您隨機抽取全新造型！</p>
+                                        <button onClick={handleRandomize} className="px-8 py-4 bg-blue-700 hover:bg-blue-600 text-white font-bold rounded-lg shadow-lg border border-blue-500 transition text-xl transform hover:scale-105"><i className="fa-solid fa-dice mr-2"></i> 抽取特徵盲盒</button>
+                                    </div>
+                                )}
+                                {tab !== 'blindBox' && tab !== 'custom' && tab !== 'frames' && tab !== 'accessories' && (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                        {AVATAR_OPTIONS[tab].map(opt => (
+                                            <button 
+                                                key={opt.id} 
+                                                onClick={() => setEditConfig({...editConfig, [tab]: opt.id, customImage: null, customImageStatus: 'none'})}
+                                                className={`p-3 rounded border transition flex flex-col items-center justify-center text-sm gap-2 h-20 ${editConfig[tab] === opt.id && editConfig.customImageStatus !== 'approved' && editConfig.customImageStatus !== 'pending' ? 'border-guild-gold bg-guild-gold/20 text-guild-gold font-bold shadow-[0_0_10px_rgba(197,159,68,0.2)]' : 'border-gray-600 bg-guild-panel hover:border-gray-400 text-gray-300'}`}
+                                            >
+                                                <span className="text-center">{opt.name}</span>
+                                                {(tab === 'skinColor' || tab === 'hairColor') && <div className="w-5 h-5 rounded border border-gray-500 shadow-inner" style={{backgroundColor: `#${opt.id}`}}></div>}
+                                                {editConfig[tab] === opt.id && editConfig.customImageStatus !== 'approved' && editConfig.customImageStatus !== 'pending' && tab !== 'skinColor' && tab !== 'hairColor' && <i className="fa-solid fa-check text-guild-gold absolute top-2 right-2 opacity-50 text-xs"></i>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {tab === 'accessories' && (
+                                    <div className="space-y-6">
+                                        <p className="text-sm text-pink-300/80 bg-pink-900/10 p-4 rounded border border-pink-900/30"><i className="fa-solid fa-circle-info mr-2"></i>配件可以直接在這裡選擇裝備，不用只靠盲盒碰運氣！</p>
+                                        <div>
+                                            <h4 className="text-sm font-bold text-guild-gold mb-3 flex items-center"><i className="fa-solid fa-gem mr-2"></i>耳環</h4>
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                                {AVATAR_OPTIONS.earrings.map(opt => (
+                                                    <button
+                                                        key={opt.id}
+                                                        onClick={() => setEditConfig({...editConfig, earrings: opt.id, customImage: null, customImageStatus: 'none'})}
+                                                        className={`p-3 rounded border transition flex items-center justify-center text-sm h-16 ${editConfig.earrings === opt.id ? 'border-guild-gold bg-guild-gold/20 text-guild-gold font-bold shadow-[0_0_10px_rgba(197,159,68,0.2)]' : 'border-gray-600 bg-guild-panel hover:border-gray-400 text-gray-300'}`}
+                                                    >
+                                                        {opt.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold text-guild-gold mb-3 flex items-center"><i className="fa-solid fa-spa mr-2"></i>髮飾</h4>
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                                {AVATAR_OPTIONS.hairAccessories.map(opt => (
+                                                    <button
+                                                        key={opt.id}
+                                                        onClick={() => setEditConfig({...editConfig, hairAccessories: opt.id, customImage: null, customImageStatus: 'none'})}
+                                                        className={`p-3 rounded border transition flex items-center justify-center text-sm h-16 ${editConfig.hairAccessories === opt.id ? 'border-guild-gold bg-guild-gold/20 text-guild-gold font-bold shadow-[0_0_10px_rgba(197,159,68,0.2)]' : 'border-gray-600 bg-guild-panel hover:border-gray-400 text-gray-300'}`}
+                                                    >
+                                                        {opt.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {tab === 'frames' && (
+                                    <div className="space-y-4 max-w-lg mx-auto mt-4">
+                                        <p className="text-sm text-yellow-500/80 mb-4 bg-yellow-900/20 p-4 rounded border border-yellow-900/30"><i className="fa-solid fa-circle-info mr-2"></i>外框需透過道具商行花費金幣購買解鎖，解鎖後即可在此永久切換。</p>
+                                        {AVATAR_OPTIONS.frames.map(frame => {
+                                            const isUnlocked = editConfig.unlockedFrames.includes(frame.id);
+                                            const isEquipped = editConfig.frameClass === frame.id;
+                                            return (
+                                                <button key={frame.id} onClick={() => { if(isUnlocked) setEditConfig({...editConfig, frameClass: frame.id}); }} disabled={!isUnlocked} className={`w-full p-5 rounded border transition flex items-center justify-between text-lg ${isEquipped ? 'border-guild-gold bg-guild-gold/20 text-guild-gold font-bold' : isUnlocked ? 'border-gray-500 hover:border-gray-300 text-gray-300' : 'border-red-900/30 bg-red-900/10 text-gray-600 cursor-not-allowed'}`}>
+                                                    <span>{frame.name}</span>
+                                                    <div>
+                                                        {isEquipped ? <span className="text-guild-gold text-sm"><i className="fa-solid fa-check mr-1"></i>已裝備</span> : isUnlocked ? <span className="text-gray-300 text-sm">點擊裝備</span> : <span className="text-red-500/50 text-sm"><i className="fa-solid fa-lock mr-1"></i>未解鎖</span>}
+                                                    </div>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="p-4 border-t border-guild-gold/20 shrink-0 bg-guild-dark">
+                                <button onClick={handleSave} className="w-full py-4 bg-gradient-to-r from-guild-gold to-yellow-500 text-guild-dark font-extrabold rounded hover:brightness-110 transition text-xl shadow-lg flex items-center justify-center">
+                                    <i className="fa-solid fa-floppy-disk mr-2"></i> 套用新造型
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const SHOP_ITEMS = [
+            { id: 'i1', name: '初級治療藥水', desc: '恢復 10 點生命值', cost: 30, type: 'consumable', icon: 'fa-flask-vial', color: 'text-green-400', effect: (s, effectiveMaxHp) => ({...s, hp: Math.min(s.hp + 10, effectiveMaxHp)}) },
+            { id: 'i2', name: '復活十字章', desc: '抵擋一次死亡懲罰(自動消耗)', cost: 150, type: 'passive', icon: 'fa-shield-heart', color: 'text-rose-400' },
+            { id: 'i_job', name: '皇家轉職憑證', desc: '等級 5 限定。賦予冒險者更換職業的權利。', cost: 400, type: 'special', icon: 'fa-scroll', color: 'text-purple-300' },
+            
+            // T1 武器
+            { id: 'w1_warrior', name: '鐵劍 (T1)', desc: '魔王戰基礎傷害+10。戰士專屬：受傷額外-1。', cost: 150, type: 'equipment', slot: 'weapon', job: '戰士', icon: 'fa-shield-halved', color: 'text-red-500', stats: { atkBase: 10, defBonus: 1 } },
+            { id: 'w1_mage', name: '學徒法杖 (T1)', desc: '魔王戰基礎傷害+10。法師專屬：經驗額外+5%。', cost: 150, type: 'equipment', slot: 'weapon', job: '法師', icon: 'fa-wand-sparkles', color: 'text-blue-500', stats: { atkBase: 10, expMult: 0.05 } },
+            { id: 'w1_ranger', name: '精靈短弓 (T1)', desc: '魔王戰基礎傷害+10。遊俠專屬：金幣額外+5%。', cost: 150, type: 'equipment', slot: 'weapon', job: '遊俠', icon: 'fa-user-ninja', color: 'text-green-500', stats: { atkBase: 10, goldMult: 0.05 } },
+            { id: 'w1_assassin', name: '暗影匕首 (T1)', desc: '魔王戰基礎傷害+10。刺客專屬：閃避機率+5%。', cost: 150, type: 'equipment', slot: 'weapon', job: '刺客', icon: 'fa-khanda', color: 'text-purple-500', stats: { atkBase: 10, dodgeBonus: 0.05 } },
+            { id: 'w1_cleric', name: '木製十字架 (T1)', desc: '魔王戰基礎傷害+10。牧師專屬：結算治癒+1HP。', cost: 150, type: 'equipment', slot: 'weapon', job: '牧師', icon: 'fa-cross', color: 'text-yellow-400', stats: { atkBase: 10, healBonus: 1 } },
+            
+            // T2 武器
+            { id: 'w2_warrior', name: '秘銀大劍 (T2)', desc: '魔王戰基礎傷害+30。戰士專屬：受傷額外-3。', cost: 800, type: 'equipment', slot: 'weapon', job: '戰士', icon: 'fa-shield-halved', color: 'text-red-400', stats: { atkBase: 30, defBonus: 3 } },
+            { id: 'w2_mage', name: '賢者水晶杖 (T2)', desc: '魔王戰基礎傷害+30。法師專屬：經驗額外+15%。', cost: 800, type: 'equipment', slot: 'weapon', job: '法師', icon: 'fa-wand-sparkles', color: 'text-blue-400', stats: { atkBase: 30, expMult: 0.15 } },
+            { id: 'w2_ranger', name: '疾風神弓 (T2)', desc: '魔王戰基礎傷害+30。遊俠專屬：金幣額外+15%。', cost: 800, type: 'equipment', slot: 'weapon', job: '遊俠', icon: 'fa-user-ninja', color: 'text-green-400', stats: { atkBase: 30, goldMult: 0.15 } },
+            { id: 'w2_assassin', name: '虛空雙刃 (T2)', desc: '魔王戰基礎傷害+30。刺客專屬：閃避機率+15%。', cost: 800, type: 'equipment', slot: 'weapon', job: '刺客', icon: 'fa-khanda', color: 'text-purple-400', stats: { atkBase: 30, dodgeBonus: 0.15 } },
+            { id: 'w2_cleric', name: '神聖祝福權杖 (T2)', desc: '魔王戰基礎傷害+30。牧師專屬：結算治癒+3HP。', cost: 800, type: 'equipment', slot: 'weapon', job: '牧師', icon: 'fa-cross', color: 'text-yellow-300', stats: { atkBase: 30, healBonus: 3 } },
+            
+            // 外框
+            { id: 'f_gold', name: '聖騎黃金外框', desc: '尊爵不凡的發光黃金外框', cost: 300, type: 'frame', icon: 'fa-crown', color: 'text-yellow-400', value: 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.8)]' },
+            { id: 'f_dark', name: '深淵魔氣外框', desc: '散發危險氣息的暗紫邊框', cost: 300, type: 'frame', icon: 'fa-skull', color: 'text-purple-400', value: 'border-purple-600 shadow-[0_0_20px_rgba(147,51,234,0.8)]' },
+            { id: 'f_cyan', name: '精靈流光外框', desc: '純淨魔力環繞的水藍外框', cost: 300, type: 'frame', icon: 'fa-water', color: 'text-cyan-400', value: 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]' }
+        ];
+
+        const getGroupSynergy = (groupId, allStudents) => {
+            if (!groupId) return { active: false, name: '', tags: [], expGoldMult: 1, dmgRed: 0, hpBonus: 0, dodgeChance: 0, healAmount: 0, desc: '' };
+            const members = allStudents.filter(s => s.groupId === groupId);
+            const hasWarrior = members.some(s => s.job === '戰士');
+            const hasMage = members.some(s => s.job === '法師');
+            const hasRanger = members.some(s => s.job === '遊俠');
+            const hasAssassin = members.some(s => s.job === '刺客');
+            const hasCleric = members.some(s => s.job === '牧師');
+
+            let expGoldMult = 1, dmgRed = 0, hpBonus = 0, dodgeChance = 0, healAmount = 0, tags = [];
+
+            if (hasWarrior) { dmgRed += 2; tags.push('🛡️防禦(傷-2)'); }
+            if (hasMage) { expGoldMult += 0.2; tags.push('⚔️攻擊(益+20%)'); }
+            if (hasRanger) { hpBonus += 10; tags.push('❤️血量(+10)'); }
+            if (hasAssassin) { dodgeChance += 0.15; tags.push('💨敏捷(15%閃避)'); }
+            if (hasCleric) { healAmount += 2; tags.push('✨治癒(戰後+2HP)'); }
+
+            const active = hasWarrior || hasMage || hasRanger || hasAssassin || hasCleric;
+            const uniqueCount = [hasWarrior, hasMage, hasRanger, hasAssassin, hasCleric].filter(Boolean).length;
+            
+            const jobActive = active;
+            let name = '小隊互補';
+            if (uniqueCount === 2) { name = '雙星陣型'; }
+            if (uniqueCount === 3) { name = '鐵三角陣型'; dmgRed += 1; expGoldMult += 0.1; hpBonus += 5; }
+            if (uniqueCount === 4) { name = '四象結界'; dmgRed += 2; expGoldMult += 0.2; hpBonus += 10; }
+            if (uniqueCount === 5) { name = '五星連珠'; dmgRed += 3; expGoldMult += 0.3; hpBonus += 20; dodgeChance += 0.1; healAmount += 2; }
+
+            // ★ 小隊協作加成（只取最高一級，不疊加；性別為「不指定」者不計入）
+            const mCount = members.filter(s => s.gender === 'M').length;
+            const fCount = members.filter(s => s.gender === 'F').length;
+            let teamName = '';
+            if (mCount >= 1 && fCount >= 1) {
+                if (Math.abs(mCount - fCount) <= 1) { teamName = '平衡同盟'; expGoldMult += 0.15; dmgRed += 1; tags.push('🤝平衡同盟(益+15%、傷-1)'); }
+                else if (mCount >= 2 && fCount >= 2) { teamName = '並肩同行'; expGoldMult += 0.10; hpBonus += 5; tags.push('🤝並肩同行(益+10%、血+5)'); }
+                else { teamName = '初識同伴'; expGoldMult += 0.05; tags.push('🤝初識同伴(益+5%)'); }
+            }
+            const finalActive = jobActive || !!teamName;
+            const finalName = [jobActive ? name : '', teamName].filter(Boolean).join(' ・ ');
+
+            let descArr = [];
+            if (dmgRed > 0) descArr.push(`受傷-${dmgRed}`);
+            if (expGoldMult > 1) descArr.push(`收益+${Math.round((expGoldMult-1)*100)}%`);
+            if (hpBonus > 0) descArr.push(`血量+${hpBonus}`);
+            if (dodgeChance > 0) descArr.push(`閃避+${Math.round(dodgeChance*100)}%`);
+            if (healAmount > 0) descArr.push(`恢復+${healAmount}`);
+
+            return { active: finalActive, name: finalActive ? finalName : '', tags, expGoldMult, dmgRed, hpBonus, dodgeChance, healAmount, desc: descArr.join(' | ') };
+        };
+
+
+        const Shop = ({ buyer, onBuy, onClose, students }) => {
+            if (!buyer) return null;
+            
+            // 這裡傳入 students 作為 prop 計算協同效果，避免使用 localStorage 導致與雲端不同步
+            const synergy = getGroupSynergy(buyer.groupId, students || []);
+            const effectiveMaxHp = buyer.maxHp + synergy.hpBonus;
+
+            return (
+                <div className="fixed inset-0 bg-black/85 flex p-4 z-50 overflow-y-auto">
+                    <div className="panel p-6 max-w-6xl w-full max-h-[90vh] flex flex-col relative border-guild-gold shadow-[0_0_30px_rgba(197,159,68,0.3)] m-auto">
+                        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white text-3xl transition hover:rotate-90 z-10"><i className="fa-solid fa-xmark"></i></button>
+                        <h2 className="text-3xl font-bold text-guild-gold border-b border-guild-gold/30 pb-3 mb-6"><i className="fa-solid fa-store mr-2"></i>道具與武器商行</h2>
+                        <div className="flex flex-col md:flex-row gap-8 overflow-y-auto pr-2 custom-scrollbar">
+                            
+                            {/* 左側：冒險者屬性面板 */}
+                            <div className="md:w-1/3 shrink-0">
+                                <div className="bg-guild-dark p-6 rounded-lg border border-guild-gold/30 sticky top-0 shadow-lg flex flex-col items-center">
+                                    <AvatarDisplay student={buyer} size="w-32 h-32" />
+                                    <div className="text-guild-gold font-bold text-xl mt-4 mb-1">{buyer.name}</div>
+                                    <div className="text-sm text-gray-400 mb-4">Lv.{buyer.level} {buyer.job}</div>
+                                    <div className="w-full space-y-3 text-sm bg-black/30 p-4 rounded-lg">
+                                        <div className="flex justify-between items-center"><span className="text-gray-400">生命:</span> <span><span className="text-red-400">{buyer.hp}</span> / {effectiveMaxHp}</span></div>
+                                        <div className="flex justify-between items-center"><span className="text-gray-400">財富:</span> <span className="text-yellow-400 font-bold text-lg">{buyer.gold} G</span></div>
+                                        <div className="flex justify-between items-center pt-2 border-t border-gray-700"><span className="text-gray-400">裝備:</span> <span className="text-blue-300 font-bold">{buyer.equipment ? buyer.equipment.name : '無'}</span></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 右側：商城列表 */}
+                            <div className="md:w-2/3 h-fit">
+                                <h3 className="text-lg font-bold text-guild-paper mb-3 flex items-center"><i className="fa-solid fa-flask mr-2 text-blue-400"></i>消耗品與憑證</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                                    {SHOP_ITEMS.filter(item => item.type === 'consumable' || item.type === 'passive' || item.type === 'special').map(item => {
+                                        const canAfford = buyer.gold >= item.cost;
+                                        const isWrongJob = item.job && buyer.job !== item.job;
+                                        const disabled = !canAfford || isWrongJob;
+                                        
+                                        let itemBg = 'bg-guild-dark/50 hover:bg-guild-dark';
+                                        let titleColor = 'text-guild-paper';
+                                        let borderGrad = 'from-guild-gold/50 via-guild-gold/10 to-transparent';
+                                        if (item.type === 'special') {
+                                            itemBg = 'bg-purple-900/30 hover:bg-purple-900/50';
+                                            titleColor = 'text-purple-300';
+                                            borderGrad = 'from-purple-500/60 via-purple-500/10 to-transparent';
+                                        }
+
+                                        return (
+                                            <div key={item.id} className={`p-[2px] rounded-xl bg-gradient-to-br ${borderGrad} shadow-lg`}>
+                                                <div className={`panel rounded-[10px] p-4 flex flex-col h-full transition relative overflow-hidden border-0 ${itemBg}`}>
+                                                    <i className="fa-solid fa-gem absolute top-2 left-2 text-[10px] text-guild-gold/20"></i>
+                                                    <i className="fa-solid fa-gem absolute top-2 right-2 text-[10px] text-guild-gold/20"></i>
+                                                    <div className="flex justify-between items-start mb-2 z-10 gap-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 bg-black/30 border-2 ${item.type === 'special' ? 'border-purple-500/50' : 'border-guild-gold/30'} shadow-inner`}>
+                                                                <i className={`fa-solid ${item.icon} ${item.color}`}></i>
+                                                            </div>
+                                                            <h4 className={`font-bold text-lg ${titleColor}`}>{item.name}</h4>
+                                                        </div>
+                                                        <span className="text-guild-gold font-bold bg-yellow-900/30 px-2 py-1 rounded text-sm shrink-0"><i className="fa-solid fa-coins mr-1"></i>{item.cost}</span>
+                                                    </div>
+                                                    <p className="text-xs text-gray-400 mb-4 flex-grow z-10 leading-relaxed">{item.desc}</p>
+                                                    {item.job && <div className="text-xs font-bold text-blue-400 mb-3 z-10"><i className="fa-solid fa-circle-exclamation mr-1"></i>限定職業: {item.job}</div>}
+                                                    <button onClick={() => onBuy(buyer.id, item)} disabled={disabled} className={`mt-auto w-full py-2 rounded font-bold transition flex items-center justify-center gap-2 z-10 ${disabled ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : (item.type === 'special' ? 'bg-purple-600 text-white hover:bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]' : 'bg-guild-gold text-guild-dark hover:bg-yellow-400 hover:scale-[1.02]')}`}>
+                                                        {isWrongJob ? <><i className="fa-solid fa-ban"></i> 職業不符</> : !canAfford ? <><i className="fa-solid fa-lock"></i> 金幣不足</> : <><i className="fa-solid fa-cart-shopping"></i> 購買</>}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <h3 className="text-lg font-bold text-blue-400 mb-3 flex items-center"><i className="fa-solid fa-khanda mr-2"></i>職業專屬武器 (裝備可獲得加成)</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                                    {SHOP_ITEMS.filter(item => item.type === 'equipment').map(item => {
+                                        const canAfford = buyer.gold >= item.cost;
+                                        const isWrongJob = item.job && buyer.job !== item.job;
+                                        const disabled = !canAfford || isWrongJob;
+                                        
+                                        // 判斷 T2 武器賦予藍色史詩光芒
+                                        let itemBg = 'bg-guild-dark/50 hover:bg-guild-dark';
+                                        let titleColor = 'text-guild-paper';
+                                        let borderGrad = 'from-guild-gold/50 via-guild-gold/10 to-transparent';
+                                        if (item.id.includes('w2_')) {
+                                            itemBg = 'bg-blue-900/20 hover:bg-blue-900/40';
+                                            titleColor = 'text-blue-300';
+                                            borderGrad = 'from-blue-400/60 via-blue-500/10 to-transparent';
+                                        }
+
+                                        return (
+                                            <div key={item.id} className={`p-[2px] rounded-xl bg-gradient-to-br ${borderGrad} shadow-lg`}>
+                                                <div className={`panel rounded-[10px] p-4 flex flex-col h-full transition relative overflow-hidden border-0 ${itemBg}`}>
+                                                    <i className="fa-solid fa-gem absolute top-2 left-2 text-[10px] text-guild-gold/20"></i>
+                                                    <i className="fa-solid fa-gem absolute top-2 right-2 text-[10px] text-guild-gold/20"></i>
+                                                    <div className="flex justify-between items-start mb-2 z-10 gap-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 bg-black/30 border-2 ${item.id.includes('w2_') ? 'border-blue-400/50' : 'border-guild-gold/30'} shadow-inner`}>
+                                                                <i className={`fa-solid ${item.icon} ${item.color}`}></i>
+                                                            </div>
+                                                            <h4 className={`font-bold text-lg ${titleColor}`}>{item.name}</h4>
+                                                        </div>
+                                                        <span className="text-guild-gold font-bold bg-yellow-900/30 px-2 py-1 rounded text-sm shrink-0"><i className="fa-solid fa-coins mr-1"></i>{item.cost}</span>
+                                                    </div>
+                                                    <p className="text-xs text-gray-400 mb-4 flex-grow z-10 leading-relaxed">{item.desc}</p>
+                                                    {item.job && <div className="text-xs font-bold text-blue-400 mb-3 z-10"><i className="fa-solid fa-circle-exclamation mr-1"></i>限定職業: {item.job}</div>}
+                                                    <button onClick={() => onBuy(buyer.id, item)} disabled={disabled} className={`mt-auto w-full py-2 rounded font-bold transition flex items-center justify-center gap-2 z-10 ${disabled ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : (item.id.includes('w2_') ? 'bg-blue-700 text-white hover:bg-blue-600 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'bg-guild-gold text-guild-dark hover:bg-yellow-400 hover:scale-[1.02]')}`}>
+                                                        {isWrongJob ? <><i className="fa-solid fa-ban"></i> 職業不符</> : !canAfford ? <><i className="fa-solid fa-lock"></i> 金幣不足</> : <><i className="fa-solid fa-khanda"></i> 裝備</>}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <h3 className="text-lg font-bold text-yellow-500 mb-3 flex items-center"><i className="fa-solid fa-crown mr-2"></i>尊爵頭像外框 (解鎖永久擁有)</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {SHOP_ITEMS.filter(item => item.type === 'frame').map(item => {
+                                        const canAfford = buyer.gold >= item.cost;
+                                        const isOwned = buyer.avatar.unlockedFrames.includes(item.value);
+                                        const disabled = !canAfford || isOwned;
+                                        return (
+                                            <div key={item.id} className={`p-[2px] rounded-xl bg-gradient-to-br ${item.color.replace('text-', 'from-')}/60 via-yellow-700/10 to-transparent shadow-lg`}>
+                                                <div className="panel rounded-[10px] p-4 flex flex-col h-full bg-guild-dark relative overflow-hidden border-0">
+                                                    <i className="fa-solid fa-gem absolute top-2 left-2 text-[10px] text-guild-gold/20"></i>
+                                                    <i className="fa-solid fa-gem absolute top-2 right-2 text-[10px] text-guild-gold/20"></i>
+                                                    <div className="flex justify-between items-start mb-2 z-10 gap-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 bg-black/30 border-2 border-yellow-600/40 shadow-inner">
+                                                                <i className={`fa-solid ${item.icon} ${item.color}`}></i>
+                                                            </div>
+                                                            <h4 className="font-bold text-lg text-yellow-500">{item.name}</h4>
+                                                        </div>
+                                                        <span className="text-guild-gold font-bold bg-yellow-900/30 px-2 py-1 rounded text-sm shrink-0"><i className="fa-solid fa-coins mr-1"></i>{item.cost}</span>
+                                                    </div>
+                                                    <p className="text-xs text-yellow-200/60 mb-4 flex-grow z-10">{item.desc}</p>
+                                                    <button onClick={() => onBuy(buyer.id, item)} disabled={disabled} className={`mt-auto w-full py-2 rounded font-bold transition flex items-center justify-center gap-2 z-10 ${isOwned ? 'bg-green-900/50 text-green-400 border border-green-600 cursor-not-allowed' : disabled ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-yellow-600 text-white hover:bg-yellow-500 shadow-[0_0_10px_rgba(202,138,4,0.5)]'}`}>
+                                                        {isOwned ? <><i className="fa-solid fa-check"></i> 已解鎖</> : !canAfford ? <><i className="fa-solid fa-lock"></i> 金幣不足</> : <><i className="fa-solid fa-unlock"></i> 解鎖外觀</>}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'science-guild';
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyDQK2SfKcC0VoI9XV_W2ScUAVRaX9PU9AM",
+            authDomain: "science-guild.firebaseapp.com",
+            projectId: "science-guild",
+            storageBucket: "science-guild.firebasestorage.app",
+            messagingSenderId: "947533162231",
+            appId: "1:947533162231:web:2c372a85035b89998415f2"
+        };
+
+        // 只允許學生修改「外觀」：逐欄檢查，其餘資料（金幣、等級、解鎖外框…）一律沿用雲端原值
+        const AVATAR_KEYS = ['skinColor','hairColor','head','hair','eyes','eyebrows','mouth','glasses','freckles','earrings','hairAccessories'];
+        const sanitizeAvatar = (n, old) => {
+            const out = {};
+            AVATAR_KEYS.forEach(k => { out[k] = AVATAR_OPTIONS[k].some(o => o.id === n[k]) ? n[k] : old[k]; });
+            out.seed = (typeof n.seed === 'string' && n.seed.length <= 40) ? n.seed : old.seed;
+            const unlocked = old.unlockedFrames || ['border-gray-500'];
+            out.frameClass = unlocked.includes(n.frameClass) ? n.frameClass : (old.frameClass || 'border-gray-500');
+            const img = n.customImage;
+            if (typeof img === 'string' && img.startsWith('data:image/') && img.length <= 200000) {
+                if (img === old.customImage) { out.customImage = old.customImage; out.customImageStatus = old.customImageStatus || 'pending'; }
+                else { out.customImage = img; out.customImageStatus = 'pending'; } // 自訂圖一律待老師審核
+            } else { out.customImage = null; out.customImageStatus = 'none'; }
+            return out;
+        };
+
+        const App = () => {
+            const fb = useRef({});
+            const [ready, setReady] = useState(false);
+            const [data, setData] = useState(null);
+            const [error, setError] = useState('');
+            const [selClass, setSelClass] = useState('');
+            const [selStudent, setSelStudent] = useState('');
+            const [pin, setPin] = useState('');
+            const [session, setSession] = useState(null);
+            const [editing, setEditing] = useState(false);
+            const [busy, setBusy] = useState(false);
+            const [notice, setNotice] = useState('');
+            const [shopOpen, setShopOpen] = useState(false);
+            const [jobPick, setJobPick] = useState(false);
+
+            useEffect(() => {
+                let unsub;
+                (async () => {
+                    try {
+                        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+                        const { getAuth, signInAnonymously, signInWithCustomToken } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+                        const { getFirestore, doc, onSnapshot, runTransaction } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+                        const cfg = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : FIREBASE_CONFIG;
+                        const app = initializeApp(cfg);
+                        const auth = getAuth(app);
+                        const db = getFirestore(app);
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
+                        else await signInAnonymously(auth);
+                        const ref = doc(db, 'artifacts', APP_ID, 'public', 'data', 'guildData', 'mainState');
+                        fb.current = { db, ref, runTransaction };
+                        // 只「讀取」：登入畫面只取班級與學生名單，這個頁面不會整包寫回資料庫
+                        unsub = onSnapshot(ref, snap => {
+                            if (snap.exists()) { const d = snap.data(); setData({ classes: d.classes || [], students: d.students || [] }); }
+                            setReady(true);
+                        }, e => { setError('連線失敗：' + e.message); setReady(true); });
+                    } catch (e) { setError('初始化失敗：' + e.message); setReady(true); }
+                })();
+                return () => unsub && unsub();
+            }, []);
+
+            const doLogin = () => {
+                const s = data.students.find(x => x.id === parseInt(selStudent));
+                if (s && (s.pin || '0000') === pin) { setSession({ id: s.id, pin }); setPin(''); setNotice(''); }
+                else alert('密碼錯誤或未選擇冒險者！');
+            };
+
+            // 所有「會改資料」的操作都走這裡：交易內重讀最新資料、驗證密碼、只改這位學生，再寫回
+            const mutateStudent = async (mutate) => {
+                setBusy(true);
+                try {
+                    const { db, ref, runTransaction } = fb.current;
+                    await runTransaction(db, async tx => {
+                        const snap = await tx.get(ref);
+                        if (!snap.exists()) throw new Error('找不到公會資料');
+                        const d = snap.data();
+                        const list = d.students || [];
+                        const idx = list.findIndex(s => s.id === session.id);
+                        if (idx < 0) throw new Error('找不到冒險者');
+                        const cur = list[idx];
+                        if ((cur.pin || '0000') !== session.pin) throw new Error('身分驗證失敗，請重新登入');
+                        const { student, msg } = mutate(cur, list);
+                        const next = [...list]; next[idx] = student;
+                        const log = { time: new Date().toLocaleTimeString('zh-TW', { hour12: false }), msg, classId: cur.classId };
+                        tx.update(ref, { students: next, logs: [log, ...(d.logs || [])].slice(0, 3000) });
+                    });
+                    return true;
+                } catch (e) { alert('操作失敗：' + e.message); return false; }
+                finally { setBusy(false); }
+            };
+
+            const saveAvatar = async (studentId, newAvatar) => {
+                const ok = await mutateStudent(cur => {
+                    const old = cur.avatar || {};
+                    return { student: { ...cur, avatar: { ...old, ...sanitizeAvatar(newAvatar, old) } }, msg: `✨ ${cur.name} 改變了造型外觀！` };
+                });
+                if (ok) { setEditing(false); setNotice('✅ 造型已儲存！回到學校的公會畫面就會看到新造型。'); }
+            };
+
+            // 購買：只收道具編號，價格、等級、職業、是否已擁有，一律在交易內用最新資料重新檢查
+            const buyItem = async (studentId, shopItem) => {
+                const item = SHOP_ITEMS.find(i => i.id === shopItem.id);
+                const now = data.students.find(s => s.id === session.id);
+                if (!item || !now) return;
+                if (item.id === 'i_job') {
+                    if (now.level < 5) return alert('等級不足 5 級，公會不受理您的轉職申請！請繼續努力。');
+                    if (now.gold < item.cost) return alert('金幣不足！');
+                    setJobPick(true);
+                    return;
+                }
+                const ok = await mutateStudent((cur, list) => {
+                    if (cur.gold < item.cost) throw new Error('金幣不足！');
+                    let s = { ...cur, gold: cur.gold - item.cost, avatar: { ...(cur.avatar || {}) } };
+                    let msg;
+                    if (item.type === 'consumable') {
+                        const syn = getGroupSynergy(cur.groupId, list);
+                        s = item.effect(s, cur.maxHp + syn.hpBonus);
+                        msg = `🧪 ${cur.name} 使用了 ${item.name}。`;
+                    } else if (item.type === 'equipment') {
+                        if (item.job !== cur.job) throw new Error('職業不符，無法裝備！');
+                        s.equipment = JSON.parse(JSON.stringify(item));
+                        msg = `⚔️ ${cur.name} 裝備了 ${item.name}。`;
+                    } else if (item.type === 'frame') {
+                        const un = s.avatar.unlockedFrames || ['border-gray-500'];
+                        if (un.includes(item.value)) throw new Error('這個外框已經解鎖過了！');
+                        s.avatar.unlockedFrames = [...un, item.value];
+                        s.avatar.frameClass = item.value;
+                        msg = `👑 ${cur.name} 購買並裝備了高階外框：${item.name}。`;
+                    } else {
+                        s.inventory = [...(cur.inventory || []), JSON.parse(JSON.stringify(item))];
+                        msg = `🛍️ ${cur.name} 購買了 ${item.name}。`;
+                    }
+                    return { student: s, msg };
+                });
+                if (ok) setNotice('✅ 購買完成！');
+            };
+
+            // 轉職：選好職業才一次扣款＋轉職，不會出現「金幣扣了卻沒轉成」
+            const confirmJob = async (job) => {
+                const cost = SHOP_ITEMS.find(i => i.id === 'i_job').cost;
+                const ok = await mutateStudent(cur => {
+                    if (cur.level < 5) throw new Error('等級不足 5 級');
+                    if (cur.gold < cost) throw new Error('金幣不足！');
+                    if (cur.job === job) throw new Error('你目前已經是這個職業了');
+                    return { student: { ...cur, gold: cur.gold - cost, job }, msg: `🎉 ${cur.name} 花費 ${cost} G 購買皇家轉職憑證，成功轉職為【${job}】！` };
+                });
+                if (ok) { setJobPick(false); setNotice(`🎉 轉職成功：${job}`); }
+            };
+
+            const Shell = ({ children }) => <div className="min-h-screen flex items-center justify-center p-4 relative z-10 animate-fade-in">{children}</div>;
+            if (!ready) return <Shell><p className="text-guild-paper/70"><i className="fa-solid fa-cloud-arrow-down animate-bounce text-blue-400 mr-2"></i>連結公會水晶網路中...</p></Shell>;
+            if (error || !data) return <Shell><div className="panel p-8 text-red-300">{error || '尚無公會資料，請通知老師。'}</div></Shell>;
+
+            const me = session ? data.students.find(s => s.id === session.id) : null;
+            if (me) {
+                const av = me.avatar || {};
+                const student = { ...me, avatar: { ...av, unlockedFrames: av.unlockedFrames || ['border-gray-500'], frameClass: av.frameClass || 'border-gray-500' } };
+                const cls = data.classes.find(c => c.id === me.classId);
+                return (
+                    <Shell>
+                        <div className="panel p-8 max-w-md w-full text-center border border-blue-500/30">
+                            <div className="flex justify-center mb-4"><AvatarDisplay student={student} size="w-32 h-32" previewPending={true} /></div>
+                            <h2 className="text-2xl font-bold text-guild-gold">{me.name}</h2>
+                            <p className="text-gray-400 text-sm mb-2">{cls ? cls.name : ''} ・ Lv.{me.level} ・ {me.job}</p>
+                            <p className="text-yellow-400 font-bold mb-6"><i className="fa-solid fa-coins mr-1"></i>{me.gold} G</p>
+                            {notice && <p className="text-green-400 text-sm mb-4">{notice}</p>}
+                            {av.customImageStatus === 'pending' && <p className="text-yellow-400 text-xs mb-4">自訂頭像等待老師審核中</p>}
+                            <button onClick={() => { setNotice(''); setShopOpen(true); }} className="w-full py-4 mb-3 bg-blue-800 hover:bg-blue-700 border border-blue-500 text-white font-bold rounded-lg text-lg"><i className="fa-solid fa-store mr-2"></i>道具與武器商行</button>
+                            <button onClick={() => { setNotice(''); setEditing(true); }} className="w-full py-4 bg-gradient-to-r from-guild-gold to-yellow-500 text-guild-dark font-bold rounded-lg text-lg"><i className="fa-solid fa-scissors mr-2"></i>進入換裝室</button>
+                            <button onClick={() => { setSession(null); setNotice(''); setSelStudent(''); }} className="w-full py-2 mt-3 text-gray-500 hover:text-white text-sm">登出</button>
+                        </div>
+                        {shopOpen && <Shop buyer={student} onBuy={buyItem} onClose={() => !busy && setShopOpen(false)} students={data.students} />}
+                        {jobPick && (
+                            <div className="fixed inset-0 bg-black/80 flex p-4 z-[60] overflow-y-auto">
+                                <div className="panel p-6 max-w-5xl w-full text-center border-guild-gold shadow-[0_0_40px_rgba(197,159,68,0.4)] m-auto">
+                                    <h2 className="text-3xl font-bold text-guild-gold mb-2">📜 選擇你的新職業</h2>
+                                    <p className="mb-6 text-gray-300">按下職業後才會扣除 {SHOP_ITEMS.find(i => i.id === 'i_job').cost} G 並完成轉職。</p>
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                        {['戰士', '法師', '遊俠', '刺客', '牧師'].map(job => (
+                                            <button key={job} disabled={job === me.job || busy} onClick={() => confirmJob(job)} className={`panel p-4 flex flex-col items-center gap-3 transition ${job === me.job ? 'opacity-40 cursor-not-allowed' : 'bg-guild-dark/50 hover:bg-guild-dark hover:border-guild-gold'}`}>
+                                                <i className={`fa-solid ${JOBS[job].icon} text-5xl ${JOBS[job].color}`}></i>
+                                                <span className="font-bold text-xl text-guild-paper">{job}{job === me.job ? '（目前）' : ''}</span>
+                                                <span className="text-xs text-gray-400">{JOBS[job].bonus}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <button onClick={() => !busy && setJobPick(false)} className="mt-6 text-gray-400 hover:text-white">取消</button>
+                                </div>
+                            </div>
+                        )}
+                        {editing && <AvatarEditor student={student} onSave={saveAvatar} onClose={() => !busy && setEditing(false)} />}
+                        {busy && <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center text-guild-gold text-xl">儲存中...</div>}
+                    </Shell>
+                );
+            }
+
+            return (
+                <Shell>
+                    <div className="panel p-8 md:p-12 max-w-lg w-full text-center border border-blue-500/30">
+                        <i className="fa-solid fa-scissors text-5xl text-blue-400 mb-4"></i>
+                        <h2 className="text-3xl font-bold text-blue-400 mb-2 tracking-widest">冒險者換裝室</h2>
+                        <p className="text-gray-400 mb-8 text-sm">登入後可以更換自己的頭像造型</p>
+                        <div className="space-y-4 text-left">
+                            <div>
+                                <label className="block text-sm text-guild-paper mb-1">所屬分會</label>
+                                <select value={selClass} onChange={e => { setSelClass(e.target.value); setSelStudent(''); }} className="w-full p-3 bg-guild-dark border border-gray-600 rounded text-guild-paper">
+                                    <option value="">-- 選擇班級 --</option>
+                                    {data.classes.filter(c => !c.isArchived).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm text-guild-paper mb-1">冒險者姓名</label>
+                                <select value={selStudent} onChange={e => setSelStudent(e.target.value)} disabled={!selClass} className="w-full p-3 bg-guild-dark border border-gray-600 rounded text-guild-paper">
+                                    <option value="">-- 選擇姓名 --</option>
+                                    {data.students.filter(s => s.classId === parseInt(selClass)).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm text-guild-paper mb-1">身分密碼</label>
+                                <input type="password" placeholder="請輸入 4 位數密碼" value={pin} onChange={e => setPin(e.target.value)} maxLength="4" className="w-full p-3 bg-guild-dark border border-gray-600 rounded text-guild-paper" onKeyDown={e => e.key === 'Enter' && doLogin()} />
+                            </div>
+                            <button onClick={doLogin} className="w-full py-4 mt-4 bg-blue-700 hover:bg-blue-600 text-white font-bold rounded shadow-lg text-lg">登入</button>
+                        </div>
+                    </div>
+                </Shell>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
