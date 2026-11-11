@@ -673,6 +673,9 @@
             return out;
         };
 
+        // 版面外殼必須定義在 App 外面：若定義在 App 裡面，每次輸入文字重新渲染都會被當成「新元件」而整個重建，輸入框就會失去焦點
+        const Shell = ({ children }) => <div className="min-h-screen flex items-center justify-center p-4 relative z-10 animate-fade-in">{children}</div>;
+
         const App = () => {
             const fb = useRef({});
             const [ready, setReady] = useState(false);
@@ -801,7 +804,6 @@
                 if (ok) { setJobPick(false); setNotice(`🎉 轉職成功：${job}`); }
             };
 
-            const Shell = ({ children }) => <div className="min-h-screen flex items-center justify-center p-4 relative z-10 animate-fade-in">{children}</div>;
             if (!ready) return <Shell><p className="text-guild-paper/70"><i className="fa-solid fa-cloud-arrow-down animate-bounce text-blue-400 mr-2"></i>連結公會水晶網路中...</p></Shell>;
             if (error || !data) return <Shell><div className="panel p-8 text-red-300">{error || '尚無公會資料，請通知老師。'}</div></Shell>;
 
